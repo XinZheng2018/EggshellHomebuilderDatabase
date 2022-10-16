@@ -1,0 +1,247 @@
+REM Execute Queries for Objects Created
+SET SERVEROUTPUT ON
+
+REM 2 Sequences
+--Sequence for table style
+SELECT *
+FROM style;
+
+
+
+-- Sequence for table elevation
+SELECT *
+FROM elevation;
+
+
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+REM 2 Views
+-- View for construction sheet
+SELECT * FROM construction_stage;
+
+--View for Option
+SELECT * FROM option_view;
+
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+REM 2 Procedures
+
+--procedure 1
+--Show ongoing tasks (percent_complete < 100) for all construction managers 
+
+EXECUTE ongoing_task;
+
+-- Procedure 2: 
+-- Show base price, elevation cost, each decorator choice cost,
+-- and the total cost of the chosen house 
+-- take input parameter = house_id
+
+execute house_price_query('H0001');
+execute house_price_query('H0002');
+execute house_price_query('H0003');
+execute house_price_query('H0004');
+execute house_price_query('H0005');
+execute house_price_query('H0006');
+execute house_price_query('H0007');
+execute house_price_query('H0008');
+execute house_price_query('H0009');
+execute house_price_query('H0010');
+execute house_price_query('H0000');
+
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+REM 1 Function
+
+-- Average base price of house under selected style (input parameter = style_name)
+SELECT avg_price_by_style('Modern') FROM DUAL;
+
+REM 1 Package
+
+REM 1. Fire an employee
+
+CREATE OR REPLACE PROCEDURE employee_firing(employeeid IN employee.employee_id%TYPE)
+IS
+BEGIN
+	c_package.fire_employee(employeeid);
+END;
+/
+REM fire a construction manager (not applicable)
+execute employee_firing('E0010');
+
+REM fire a sales manager (not applicable)
+execute employee_firing('E0007');
+
+REM fire an assistant (applicable)
+execute employee_firing('E0004');
+
+REM no such employee
+execute employee_firing('E0000');
+
+
+REM 2. Hire an employee
+
+CREATE OR REPLACE PROCEDURE employee_hiring(employeeid IN employee.employee_id%TYPE,
+				lastname IN employee.lname%TYPE,
+				firstname IN employee.fname%TYPE,
+				title IN employee.title%TYPE,
+				license IN employee.license_no%TYPE)
+IS
+BEGIN
+	c_package.hire_employee(employeeid,
+				lastname,
+				firstname,
+				title,
+				license);
+
+END;
+/
+Execute employee_hiring('E0011', 'Garth', 'Brooks', 'Assistant', '11');
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+REM 2 Triggers
+
+REM Test Trigger1: check contract's estimate completion date
+REM Successful insertion test
+REM Insert a house with no contract to test on the trigger
+INSERT INTO house
+VALUES ('H0011', 549500.00, NULL,500.00, NULL,1);
+
+1 row inserted.
+
+REM insert into contract with est_completion_date within required date
+
+INSERT INTO contract
+VALUES 
+('C0011', 'H0011', 'B0001', 'E0001', 'Portfolio Loan', 850000.00, 'EA001', 'BA003', '9-Sep-2022', '10-Sep-2021', 1, 1, 1);
+
+REM Wrong insertion test
+INSERT INTO constructionsheet
+VALUES
+('CS032', 2, '16-Jun-2022', '06-Aug-2022', 'E0010', 'H0010');
+INSERT INTO constructionsheet
+VALUES
+('CS033', 2, '16-Jun-2022', '06-Aug-2022', 'E0010', 'H0010');
+
+DELETE FROM constructionsheet where construction_id = 'CS032';
+
+
+REM Trigger2
+
+REM Successful insertion test
+INSERT INTO constructionsheet
+VALUES
+('CS032', 2, '16-Jun-2022', '06-Aug-2022', 'E0010', 'H0010');
+
+REM Wrong insertion test
+INSERT INTO constructionsheet
+VALUES
+('CS033', 2, '16-Jun-2022', '06-Aug-2022', 'E0010', 'H0010');
+
+DELETE FROM constructionsheet where construction_id = 'CS032';
+
+
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+REM Scheduled Job
+
+– show details of scheduled job
+
+select * from user_scheduler_job_run_details
+WHERE status = 'SUCCEEDED';
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+REM 3 Roles
+
+REM grant the role sales_representative to the user advdb
+GRANT sales_representative TO advdb; 
+
+
+REM To test the successful grant, login to the account of another user and run the script below. 
+update SCHEMA_USERNAME.subdivision 
+set map = 'no map'
+where subdivision_id = 'S0001'; 
+
+REM Insertion with privilege 
+INSERT INTO SCHEMA_USERNAME.house
+VALUES 
+('H0011', 789000, NULL, 800, NULL, 1);
+
+1 row inserted.
+
+DELETE FROM SCHEMA_USERNAME.house
+WHERE house_id = 'H0011'; 
+
+1 row deleted.
+
+REM grant the role construction_mgr to the user advdb
+REVOKE sales_representative FROM advdb; 
+GRANT construction_mgr TO advdb; 
+REM Insertion with no priviledge
+INSERT INTO SCHEMA_USERNAME.contract
+VALUES 
+('C0011', 'H0011', 'B0001', 'E0001', 'Portfolio Loan', 850000.00, 'EA001', 'BA003', '9-Sep-2022', '10-Sep-2021', 1, 1, 1);
+
+REM Insertion with priviledge
+INSERT INTO SCHEMA_USERNAME.style
+VALUES
+('new style', 4); 
+
+1 row inserted.
+
+REM grant the user with the role buyers
+REVOKE construction_mgr FROM advdb; 
+GRANT buyers TO advdb; 
+
+REM Insertion with no previledge
+INSERT INTO SCHEMA_USERNAME.contract
+VALUES 
+('C0011', 'H0011', 'B0001', 'E0001', 'Portfolio Loan', 850000.00, 'EA001', 'BA003', '9-Sep-2022', '10-Sep-2021', 1, 1, 1);
+
+REM Selection with previledge
+SELECT * FROM xinzhen2.construction_stage; 
+
+
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+REM 2 Alternate Indexes
+
+– Test subdivision_idx 
+SELECT subdivision_id,subdivision_name, map
+FROM subdivision
+WHERE subdivision_name = ‘Palm Springs’;
+
+
+– Test room_idx 
+SELECT hr.house_id, r.room_name, hr.floor, 
+ hr."size", hr.num_window 
+FROM room r JOIN "House-Room" hr USING(room_id)
+WHERE r.room_name = 'Study';
+
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+REM De-normalization with Materialized View
+– Materialized view construction_progress
+SELECT *
+FROM construction_progress
+WHERE house_id = 'H0003';	
+
+– Before de-normalization
+SELECT c.house_id, c.stage, t.task_desc, tp.percent_complete
+FROM constructionsheet c JOIN taskprogress tp
+     			USING(construction_id)
+                   JOIN task t USING(task_id)
+WHERE c.house_id = 'H0003';
+
